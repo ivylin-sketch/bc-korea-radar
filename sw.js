@@ -1,9 +1,9 @@
-const CACHE_NAME = "bc-korea-radar-zine-v1";
+const CACHE_NAME = "bc-korea-radar-radar-icon-v2";
 const APP_URL = new URL("./index.html", self.registration.scope).href;
 const APP_SHELL = [
   APP_URL,
   new URL("./manifest.webmanifest", self.registration.scope).href,
-  new URL("./icon-192.png", self.registration.scope).href,
+  new URL("./radar-icon-192.png", self.registration.scope).href,
 ];
 
 self.addEventListener("install", (event) => {
@@ -60,8 +60,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
-      icon: new URL("./icon-192.png", self.registration.scope).href,
-      badge: new URL("./badge-96.png", self.registration.scope).href,
+      icon: new URL("./radar-icon-192.png", self.registration.scope).href,
+      badge: new URL("./radar-badge-96.png", self.registration.scope).href,
       tag: `bc-radar-${payload.type}`,
       renotify: true,
       data: { url: payload.url || "./index.html" },

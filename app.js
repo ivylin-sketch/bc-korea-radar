@@ -594,8 +594,8 @@ async function localNotification(type) {
   }[type];
   await registration.showNotification(copy[0], {
     body: copy[1],
-    icon: "./icon-192.png",
-    badge: "./badge-96.png",
+    icon: "./radar-icon-192.png",
+    badge: "./radar-badge-96.png",
     tag: `bc-radar-${type}`,
     data: { url: "./index.html?from=notification" },
   });
