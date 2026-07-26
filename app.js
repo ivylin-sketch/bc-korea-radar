@@ -112,7 +112,7 @@ function gate() {
         <label>设置密码<input id="password" type="password" required minlength="10" autocomplete="new-password" placeholder="至少 10 个字符"></label>
         <label>一次性邀请码（首次登录填写）<input id="invite-token" type="text" autocomplete="off" placeholder="已有账号再次登录时可留空"></label>
         <p class="gate-message" id="gate-message">首次使用邀请链接设置密码；以后只需邮箱和密码。</p>
-        <button class="primary-button" type="submit">首次接受邀请 / 已有账号登录</button>
+        <button class="primary-button" id="auth-submit" type="submit">首次接受邀请 / 已有账号登录</button>
       </form>
     </section>
     <p class="privacy-note">不上传 X Cookie/token · 不抓取或展示 X 图片 · 仅保存文字、数据和原帖链接</p>
@@ -287,19 +287,37 @@ function bind() {
 async function acceptInvite(event) {
   event.preventDefault();
   const message = document.querySelector("#gate-message");
+  const submitButton = document.querySelector("#auth-submit");
+  const email = document.querySelector("#email").value;
+  const password = document.querySelector("#password").value;
+  if (submitButton.disabled) return;
+  submitButton.disabled = true;
+  submitButton.textContent = "正在登录…";
   message.textContent = "正在验证邀请…";
   try {
     const inviteToken = document.querySelector("#invite-token").value.trim();
-    const response = await fetch(`${API_ORIGIN}/functions/v1/radar-app/api/auth/${inviteToken ? "accept-invite" : "sign-in"}`, {
+    let response = await fetch(`${API_ORIGIN}/functions/v1/radar-app/api/auth/${inviteToken ? "accept-invite" : "sign-in"}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        email: document.querySelector("#email").value,
-        password: document.querySelector("#password").value,
+        email,
+        password,
         ...(inviteToken ? { inviteToken } : {}),
       }),
     });
-    const payload = await response.json();
+    let payload = await response.json();
+    if (!response.ok && inviteToken) {
+      message.textContent = "邀请已使用，正在尝试已有账号登录…";
+      response = await fetch(
+        `${API_ORIGIN}/functions/v1/radar-app/api/auth/sign-in`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        },
+      );
+      payload = await response.json();
+    }
     if (!response.ok || !payload.accessToken) throw new Error(payload.message || "邀请验证失败");
     localStorage.setItem("bc-radar-access-token", payload.accessToken);
     if (payload.refreshToken) localStorage.setItem("bc-radar-refresh-token", payload.refreshToken);
@@ -309,6 +327,8 @@ async function acceptInvite(event) {
     await loadPrivateData();
   } catch (error) {
     message.textContent = error.message || "验证环境暂未连接云端。";
+    submitButton.disabled = false;
+    submitButton.textContent = "首次接受邀请 / 已有账号登录";
   }
 }
 
