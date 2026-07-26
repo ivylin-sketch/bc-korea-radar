@@ -1,4 +1,4 @@
-const CACHE_NAME = "bc-korea-radar-phase0-v3";
+const CACHE_NAME = "bc-korea-radar-zine-v1";
 const APP_URL = new URL("./index.html", self.registration.scope).href;
 const APP_SHELL = [
   APP_URL,
