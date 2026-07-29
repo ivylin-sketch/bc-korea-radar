@@ -23,6 +23,7 @@ const state = {
   dataMessage: "",
   listType: "hot",
   detailId: null,
+  selectedBriefId: null,
 };
 
 const compact = (value) =>
@@ -89,12 +90,13 @@ const safeMediaUrl = (value) => {
 function mediaFor(post) {
   return (Array.isArray(post.mediaAssets) ? post.mediaAssets : [])
     .map((asset) => {
-      const displayUrl = safeMediaUrl(
+      const fallbackUrl = safeMediaUrl(
         asset.type === "video" ? asset.posterUrl : asset.posterUrl || asset.url,
       );
-      if (!displayUrl) return null;
+      if (!fallbackUrl) return null;
       return {
-        displayUrl,
+        displayUrl: `${API_ORIGIN}/functions/v1/radar-app/api/media?url=${encodeURIComponent(fallbackUrl)}`,
+        fallbackUrl,
         type: asset.type === "video" ? "video" : "image",
         source: asset.source === "quoted" ? "quoted" : "main",
       };
@@ -119,7 +121,8 @@ function mediaFigure(post, detail = false) {
   }
   const first = media[0];
   return `<figure class="post-media ${detail ? "detail-media-main" : ""}">
-    <img src="${first.displayUrl}" alt="" loading="${detail ? "eager" : "lazy"}" decoding="async" referrerpolicy="no-referrer">
+    <img src="${escapeHtml(first.displayUrl)}" data-fallback-src="${escapeHtml(first.fallbackUrl)}" alt="${escapeHtml(post.visualDescription || "X 原帖配图")}" loading="${detail ? "eager" : "lazy"}" decoding="async" referrerpolicy="no-referrer">
+    <span class="media-error">图片暂未载入<small>仍可查看原帖与画面说明</small></span>
     <figcaption>${first.source === "quoted" ? "引用帖图片" : first.type === "video" ? "视频封面" : `X 图片 1/${media.length}`}</figcaption>
   </figure>`;
 }
@@ -162,7 +165,7 @@ function detail(post) {
               .map(
                 (asset, index) =>
                   `<button data-detail-media="${index + 1}" aria-label="查看第 ${index + 2} 张图片">
-                    <img src="${asset.displayUrl}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+                    <img src="${escapeHtml(asset.displayUrl)}" data-fallback-src="${escapeHtml(asset.fallbackUrl)}" alt="${escapeHtml(post.visualDescription || "X 原帖配图")}" loading="lazy" decoding="async" referrerpolicy="no-referrer">
                     ${asset.type === "video" ? "<span>VIDEO</span>" : ""}
                   </button>`,
               )
@@ -175,6 +178,11 @@ function detail(post) {
       <p class="detail-author">${escapeHtml(post.author)} · ${escapeHtml(post.handle)} · ${escapeHtml(post.time)}</p>
       <h1 lang="ko">${escapeHtml(post.ko)}</h1>
       <p class="detail-translation">${escapeHtml(post.zh || "AI 中文翻译暂未生成")}</p>
+      ${
+        post.visualDescription
+          ? `<section class="visual-note"><span>画面说明</span><p>${escapeHtml(post.visualDescription)}</p></section>`
+          : ""
+      }
       <section class="signal-note">
         <span>BC SIGNAL</span>
         <p>${escapeHtml(post.why || "AI 洞察暂未生成；原帖数据仍可查看。")}</p>
@@ -266,16 +274,17 @@ function today() {
 }
 
 function history() {
-  const rows = state.history.map((brief) => [
-    dateLabel(brief.brief_date),
-    brief.is_monday ? "周一合并版" : "工作日",
-    `${brief.hot_count} 热点 · ${brief.signal_count} 苗头`,
-    brief.status === "partial" ? "部分生成" : "已生成",
-  ]);
   return `<section class="inner-page">
     <p class="eyebrow">ARCHIVE</p><h1>历史简报</h1>
     <p class="section-intro">工作日自动生成，周末内容合并到周一。</p>
-    ${rows.length ? `<div class="history-list">${rows.map((row)=>`<button class="history-row"><span class="history-date"><b>${row[0]}</b><small>${row[1]}</small></span><span class="history-count">${row[2]}</span><span class="${row[3]==="部分生成"?"recovered":""}">${row[3]}</span><i>›</i></button>`).join("")}</div>` : `<div class="empty-state"><span>BC</span><h2>暂无历史简报</h2><p>发布后的简报会永久保存在这里。</p></div>`}
+    ${state.history.length ? `<div class="history-list">${state.history.map((brief) => {
+      const status = brief.status === "partial" ? "部分生成" : "已生成";
+      return `<button class="history-row" data-brief-id="${escapeHtml(brief.id)}" aria-label="打开 ${escapeHtml(dateLabel(brief.brief_date))} 简报">
+        <span class="history-date"><b>${escapeHtml(dateLabel(brief.brief_date))}</b><small>${brief.is_monday ? "周一合并版" : "工作日"}</small></span>
+        <span class="history-count">${brief.hot_count} 热点 · ${brief.signal_count} 苗头</span>
+        <span class="${status === "部分生成" ? "recovered" : ""}">${status}</span><i aria-hidden="true">›</i>
+      </button>`;
+    }).join("")}</div>` : `<div class="empty-state"><span>BC</span><h2>暂无历史简报</h2><p>发布后的简报会永久保存在这里。</p></div>`}
   </section>`;
 }
 
@@ -343,10 +352,27 @@ function render() {
 function bind() {
   document.querySelectorAll("[data-tab]").forEach((button) => {
     button.addEventListener("click", () => {
+      const shouldReloadLatest =
+        button.dataset.tab === "today" && state.selectedBriefId;
       state.tab = button.dataset.tab;
       state.detailId = null;
+      if (shouldReloadLatest) {
+        state.selectedBriefId = null;
+        void loadPrivateData(true);
+        return;
+      }
       render();
       scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
+  document.querySelectorAll("[data-brief-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.tab = "today";
+      state.detailId = null;
+      state.listType = "hot";
+      state.selectedBriefId = button.dataset.briefId;
+      void loadPrivateData(true, state.selectedBriefId);
+      scrollTo({ top: 0 });
     });
   });
   document.querySelectorAll("[data-open-post]").forEach((article) => {
@@ -390,6 +416,11 @@ function bind() {
   });
   document.querySelectorAll(".post-media img,.detail-filmstrip img").forEach((image) => {
     image.addEventListener("error", () => {
+      const fallback = image.dataset.fallbackSrc;
+      if (fallback && image.src !== fallback) {
+        image.src = fallback;
+        return;
+      }
       image.closest(".post-media,.detail-filmstrip button")?.classList.add("is-broken");
     });
   });
@@ -488,13 +519,15 @@ async function refreshAccessToken() {
   return true;
 }
 
-async function loadPrivateData(allowRefresh = true) {
+async function loadPrivateData(allowRefresh = true, briefId = null) {
   state.dataState = "loading";
   if (!state.gate) render();
   const accessToken = localStorage.getItem("bc-radar-access-token");
   try {
+    const briefApiUrl = new URL(`${API_ORIGIN}/functions/v1/brief-api`);
+    if (briefId) briefApiUrl.searchParams.set("briefId", briefId);
     const response = await fetch(
-      `${API_ORIGIN}/functions/v1/brief-api`,
+      briefApiUrl,
       {
         headers: accessToken
           ? { authorization: `Bearer ${accessToken}` }
@@ -502,7 +535,7 @@ async function loadPrivateData(allowRefresh = true) {
       },
     );
     if (response.status === 401 && allowRefresh && (await refreshAccessToken())) {
-      return loadPrivateData(false);
+      return loadPrivateData(false, briefId);
     }
     const payload = await response.json();
     if (response.status === 401) {
@@ -517,6 +550,7 @@ async function loadPrivateData(allowRefresh = true) {
 
     state.latestBrief = payload.latestBrief;
     state.history = payload.history || [];
+    state.selectedBriefId = briefId;
     posts = (payload.latestBrief?.posts || []).map((post) => ({
       ...post,
       time: dateTime(post.publishedAt),
@@ -525,6 +559,10 @@ async function loadPrivateData(allowRefresh = true) {
     }));
     state.dataState = "ready";
     state.dataMessage = "";
+    const locationUrl = new URL(location.href);
+    if (briefId) locationUrl.searchParams.set("brief", briefId);
+    else locationUrl.searchParams.delete("brief");
+    window.history.replaceState({}, "", locationUrl);
     render();
   } catch (error) {
     state.dataState = "error";
@@ -605,4 +643,9 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js", { scope: "./" });
 }
 render();
-if (!state.gate) loadPrivateData();
+if (!state.gate) {
+  loadPrivateData(
+    true,
+    new URLSearchParams(location.search).get("brief"),
+  );
+}

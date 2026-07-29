@@ -1,4 +1,4 @@
-
+@import "tailwindcss";
 
 :root {
   --paper: #f2ebdc;
@@ -596,10 +596,31 @@ input:focus-visible {
 }
 
 .post-media img {
+  display: block;
   width: 100%;
   height: 100%;
   min-height: inherit;
   object-fit: cover;
+}
+
+.media-error {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-content: center;
+  padding: 18px;
+  color: var(--forest);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.media-error small {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 500;
 }
 
 .post-media figcaption {
@@ -646,6 +667,10 @@ input:focus-visible {
 .post-media.is-broken img,
 .detail-filmstrip button.is-broken img {
   display: none;
+}
+
+.post-media.is-broken .media-error {
+  display: grid;
 }
 
 .post-card-copy {
@@ -809,6 +834,11 @@ input:focus-visible {
   background: transparent;
   text-align: left;
   cursor: pointer;
+  touch-action: manipulation;
+}
+
+.history-row:active {
+  background: var(--sage-soft);
 }
 
 .history-date b,
@@ -1174,6 +1204,27 @@ input:focus-visible {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.75;
+}
+
+.visual-note {
+  margin-top: 18px;
+  padding: 14px 15px;
+  border: 1px dashed rgba(45, 105, 75, 0.45);
+  background: rgba(251, 247, 237, 0.62);
+}
+
+.visual-note span {
+  color: var(--forest);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.visual-note p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
 }
 
 .signal-note {
