@@ -331,8 +331,15 @@ function status() {
 
 function app() {
   const content = { today, history, search, saved, status }[state.tab]();
+  const liveStamp =
+    state.dataState !== "ready"
+      ? "BC INTERNAL"
+      : state.latestBrief?.status === "partial" ||
+          state.latestBrief?.aiStatus === "failed"
+        ? "部分生成"
+        : "오늘 생성 완료";
   return `<div class="app-shell">
-    <header class="masthead">${brand()}<div class="masthead-actions"><span class="live-stamp">${state.dataState === "ready" ? "오늘 생성 완료" : "BC INTERNAL"}</span><button class="install-button" id="install">安装</button></div></header>
+    <header class="masthead">${brand()}<div class="masthead-actions"><span class="live-stamp">${liveStamp}</span><button class="install-button" id="install">安装</button></div></header>
     <main>${content}</main>
     ${state.detailId ? "" : `<nav class="bottom-nav" aria-label="主导航">${tabs.map(([id,label])=>`<button data-tab="${id}" class="${state.tab===id?"active":""}">${label}</button>`).join("")}</nav>`}
   </div>`;
